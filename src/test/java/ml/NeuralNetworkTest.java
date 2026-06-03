@@ -103,5 +103,50 @@ class NeuralNetworkTest {
         Matrix input = new Matrix(new double[][]{{0.4}});
         assertEquals(nn.predict(input).get(0, 0), loaded.predict(input).get(0, 0), 1e-12);
     }
+
+    @Test
+    void xorDemoLearnsTheXorPattern() {
+        NeuralNetwork nn = new NeuralNetwork(new int[]{2, 4, 1}, 0.5, 42L);
+        Matrix[] inputs = {
+                new Matrix(new double[][]{{0.0}, {0.0}}),
+                new Matrix(new double[][]{{0.0}, {1.0}}),
+                new Matrix(new double[][]{{1.0}, {0.0}}),
+                new Matrix(new double[][]{{1.0}, {1.0}})
+        };
+        Matrix[] targets = {
+                new Matrix(new double[][]{{0.0}}),
+                new Matrix(new double[][]{{1.0}}),
+                new Matrix(new double[][]{{1.0}}),
+                new Matrix(new double[][]{{0.0}})
+        };
+
+        double initialLoss = 0.0;
+        for (int i = 0; i < inputs.length; i++) {
+            initialLoss += mse(nn.predict(inputs[i]), targets[i]);
+        }
+        initialLoss /= inputs.length;
+
+        for (int epoch = 0; epoch < 10_000; epoch++) {
+            for (int i = 0; i < inputs.length; i++) {
+                nn.train(inputs[i], targets[i]);
+            }
+        }
+
+        double finalLoss = 0.0;
+        double[] predictions = new double[4];
+        for (int i = 0; i < inputs.length; i++) {
+            Matrix out = nn.predict(inputs[i]);
+            predictions[i] = out.get(0, 0);
+            finalLoss += mse(out, targets[i]);
+        }
+        finalLoss /= inputs.length;
+
+        assertTrue(finalLoss < initialLoss, "XOR training should reduce loss");
+        assertTrue(finalLoss < 0.15, "XOR demo should get reasonably low error");
+        assertTrue(predictions[0] < 0.4);
+        assertTrue(predictions[1] > 0.6);
+        assertTrue(predictions[2] > 0.6);
+        assertTrue(predictions[3] < 0.4);
+    }
 }
 

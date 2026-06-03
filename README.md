@@ -58,6 +58,24 @@ nn.train(input, target);
 Matrix output = nn.predict(input);
 ```
 
+### XOR Demo
+
+You can run the built-in XOR demo from `Main`:
+
+```bash
+mvn test
+mvn exec:java -Dexec.mainClass=Main
+```
+
+The demo trains a `2 → 4 → 1` network on the XOR truth table with a fixed seed and prints:
+- training epochs
+- final average MSE
+- the four predictions for `(0,0)`, `(0,1)`, `(1,0)`, `(1,1)`
+
+Expected behavior after training:
+- `(0,0)` and `(1,1)` should be near 0
+- `(0,1)` and `(1,0)` should be near 1
+
 ### Saving Models
 
 If you call:
@@ -78,6 +96,12 @@ Absolute paths and paths that already include directories are saved exactly wher
 
 ```bash
 mvn test
+```
+
+To run the XOR demo directly:
+
+```bash
+mvn -q -DskipTests compile exec:java -Dexec.mainClass=Main
 ```
 
 ## Implementation Notes

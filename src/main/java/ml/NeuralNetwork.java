@@ -18,6 +18,14 @@ public class NeuralNetwork {
 	private double lastLoss = Double.NaN;
 
 	public NeuralNetwork(int[] layerSizes, double learningRate) {
+		this(layerSizes, learningRate, new Random());
+	}
+
+	public NeuralNetwork(int[] layerSizes, double learningRate, long seed) {
+		this(layerSizes, learningRate, new Random(seed));
+	}
+
+	private NeuralNetwork(int[] layerSizes, double learningRate, Random rnd) {
 		if (layerSizes == null || layerSizes.length < 2) {
 			throw new IllegalArgumentException("There must be at least 2 layers (input and output).");
 		}
@@ -28,7 +36,6 @@ public class NeuralNetwork {
 		this.layerOutputs = new Matrix[layers];
 		this.zs = new Matrix[layers - 1];
 
-		Random rnd = new Random();
 		for (int i = 0; i < layers - 1; i++) {
 			int rows = layerSizes[i + 1];
 			int cols = layerSizes[i];
