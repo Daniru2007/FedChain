@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Objects;
 import java.util.Random;
 
 public class NeuralNetwork {
@@ -136,6 +137,38 @@ public class NeuralNetwork {
 		return lastLoss;
 	}
 
+	public Matrix[] getParameters() {
+		Matrix[] params = new Matrix[weights.length + biases.length];
+		System.arraycopy(weights, 0, params, 0, weights.length);
+		System.arraycopy(biases, 0, params, weights.length, biases.length);
+		return params;
+	}
+
+	public void setParameters(Matrix[] parameters) {
+		Objects.requireNonNull(parameters, "Parameters cannot be null.");
+		if (parameters.length != weights.length + biases.length) {
+			throw new IllegalArgumentException("Parameter count does not match network architecture.");
+		}
+
+		for (int i = 0; i < weights.length; i++) {
+			validateShape(parameters[i], weights[i].getRows(), weights[i].getCols(), "weight " + i);
+		}
+		for (int i = 0; i < biases.length; i++) {
+			validateShape(parameters[weights.length + i], biases[i].getRows(), biases[i].getCols(), "bias " + i);
+		}
+
+		for (int i = 0; i < weights.length; i++) {
+			weights[i] = parameters[i];
+		}
+		for (int i = 0; i < biases.length; i++) {
+			biases[i] = parameters[weights.length + i];
+		}
+	}
+
+	public NeuralNetwork copy() {
+		return new NeuralNetwork(copyMatrices(weights), copyMatrices(biases), learningRate);
+	}
+
 	private static double computeMSE(Matrix a, Matrix b) {
 		double[][] da = a.getData();
 		double[][] db = b.getData();
@@ -149,6 +182,19 @@ public class NeuralNetwork {
 			}
 		}
 		return sum / Math.max(1, rows * cols);
+	}
+
+	private static Matrix[] copyMatrices(Matrix[] source) {
+		Matrix[] copy = new Matrix[source.length];
+		System.arraycopy(source, 0, copy, 0, source.length);
+		return copy;
+	}
+
+	private static void validateShape(Matrix matrix, int rows, int cols, String name) {
+		Objects.requireNonNull(matrix, name + " cannot be null.");
+		if (matrix.getRows() != rows || matrix.getCols() != cols) {
+			throw new IllegalArgumentException(name + " shape mismatch.");
+		}
 	}
 
 	/**
