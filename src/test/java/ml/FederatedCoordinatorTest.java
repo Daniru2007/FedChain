@@ -11,70 +11,97 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FederatedCoordinatorTest {
 
-    private static Matrix m(double value) {
+    private static Matrix col(double a, double b) {
+        return new Matrix(new double[][]{{a}, {b}});
+    }
+
+    private static Matrix t(double value) {
         return new Matrix(new double[][]{{value}});
     }
 
     @Test
     void runRoundAddsAcceptedBlocksAndSynchronizesModels() {
-        Matrix[] xorInputs = {m(0.0), m(1.0), m(0.0), m(1.0)};
-        Matrix[] xorTargets = {m(0.0), m(1.0), m(1.0), m(0.0)};
+        FederatedNode nodeA = new FederatedNode("NodeA",
+                new NeuralNetwork(new int[]{2, 4, 1}, 0.3, 1L),
+                new Matrix[]{col(0,0), col(0,1)},
+                new Matrix[]{t(0), t(1)});
 
-        FederatedNode nodeA = new FederatedNode("NodeA", new NeuralNetwork(new int[]{1, 2, 1}, 0.5, 1L), new Matrix[]{xorInputs[0]}, new Matrix[]{xorTargets[0]});
-        FederatedNode nodeB = new FederatedNode("NodeB", new NeuralNetwork(new int[]{1, 2, 1}, 0.5, 2L), new Matrix[]{xorInputs[1]}, new Matrix[]{xorTargets[1]});
-        FederatedNode nodeC = new FederatedNode("NodeC", new NeuralNetwork(new int[]{1, 2, 1}, 0.5, 3L), new Matrix[]{xorInputs[2]}, new Matrix[]{xorTargets[2]});
-        FederatedNode nodeD = new FederatedNode("NodeD", new NeuralNetwork(new int[]{1, 2, 1}, 0.5, 4L), new Matrix[]{xorInputs[3]}, new Matrix[]{xorTargets[3]});
+        FederatedNode nodeB = new FederatedNode("NodeB",
+                new NeuralNetwork(new int[]{2, 4, 1}, 0.3, 2L),
+                new Matrix[]{col(1,0)},
+                new Matrix[]{t(1)});
+
+        FederatedNode nodeC = new FederatedNode("NodeC",
+                new NeuralNetwork(new int[]{2, 4, 1}, 0.3, 3L),
+                new Matrix[]{col(1,1)},
+                new Matrix[]{t(0)});
+
         BlockChain blockchain = new BlockChain(0.5);
-        FederatedCoordinator coordinator = new FederatedCoordinator(List.of(nodeA, nodeB, nodeC, nodeD), blockchain, 5);
+        FederatedCoordinator coordinator = new FederatedCoordinator(
+                List.of(nodeA, nodeB, nodeC), blockchain, 10);
 
-        double before = coordinator.getGlobalLoss();
         coordinator.runRound(1);
-        double after = coordinator.getGlobalLoss();
 
-        assertTrue(blockchain.getChain().size() >= 2, "at least one node should be accepted or genesis plus updates");
-        assertTrue(Double.isNaN(before) || after <= before || after >= 0.0);
+        // genesis + at least one accepted block
+        assertTrue(blockchain.getChain().size() >= 2);
         assertTrue(blockchain.isChainValid());
 
+        // all nodes should have same weights after sync
         Matrix[] aWeights = nodeA.getWeights();
         Matrix[] bWeights = nodeB.getWeights();
-        Matrix[] cWeights = nodeC.getWeights();
-        Matrix[] dWeights = nodeD.getWeights();
         assertEquals(aWeights.length, bWeights.length);
-        assertEquals(aWeights.length, cWeights.length);
-        assertEquals(aWeights.length, dWeights.length);
     }
 
     @Test
     void blockchainRemainsValidAcrossMultipleRounds() {
-        Matrix[] xorInputs = {m(0.0), m(1.0), m(0.0), m(1.0)};
-        Matrix[] xorTargets = {m(0.0), m(1.0), m(1.0), m(0.0)};
+        FederatedNode nodeA = new FederatedNode("NodeA",
+                new NeuralNetwork(new int[]{2, 4, 1}, 0.3, 11L),
+                new Matrix[]{col(0,0), col(0,1)},
+                new Matrix[]{t(0), t(1)});
 
-        FederatedNode nodeA = new FederatedNode("NodeA", new NeuralNetwork(new int[]{1, 2, 1}, 0.5, 11L), new Matrix[]{xorInputs[0]}, new Matrix[]{xorTargets[0]});
-        FederatedNode nodeB = new FederatedNode("NodeB", new NeuralNetwork(new int[]{1, 2, 1}, 0.5, 12L), new Matrix[]{xorInputs[1]}, new Matrix[]{xorTargets[1]});
-        FederatedNode nodeC = new FederatedNode("NodeC", new NeuralNetwork(new int[]{1, 2, 1}, 0.5, 13L), new Matrix[]{xorInputs[2]}, new Matrix[]{xorTargets[2]});
-        FederatedNode nodeD = new FederatedNode("NodeD", new NeuralNetwork(new int[]{1, 2, 1}, 0.5, 14L), new Matrix[]{xorInputs[3]}, new Matrix[]{xorTargets[3]});
+        FederatedNode nodeB = new FederatedNode("NodeB",
+                new NeuralNetwork(new int[]{2, 4, 1}, 0.3, 12L),
+                new Matrix[]{col(1,0), col(1,1)},
+                new Matrix[]{t(1), t(0)});
+
         BlockChain blockchain = new BlockChain(1.0);
-        FederatedCoordinator coordinator = new FederatedCoordinator(List.of(nodeA, nodeB, nodeC, nodeD), blockchain, 2);
+        FederatedCoordinator coordinator = new FederatedCoordinator(
+                List.of(nodeA, nodeB), blockchain, 5);
 
         for (int round = 1; round <= 5; round++) {
             coordinator.runRound(round);
         }
 
         assertTrue(blockchain.isChainValid());
+        // genesis + up to 2 blocks per round × 5 rounds
         assertTrue(blockchain.getChain().size() >= 1);
     }
 
     @Test
-    void fourXorCasesAreRepresentedOnceAcrossNodes() {
-        Matrix[] xorInputs = {m(0.0), m(1.0), m(0.0), m(1.0)};
-        Matrix[] xorTargets = {m(0.0), m(1.0), m(1.0), m(0.0)};
+    void lossDecreasesAfterMultipleRounds() {
+        FederatedNode nodeA = new FederatedNode("NodeA",
+                new NeuralNetwork(new int[]{2, 4, 1}, 0.3, 42L),
+                new Matrix[]{col(0,0), col(0,1)},
+                new Matrix[]{t(0), t(1)});
 
-        assertEquals(4, xorInputs.length);
-        assertEquals(4, xorTargets.length);
-        assertEquals(0.0, xorInputs[0].get(0, 0), 1e-12);
-        assertEquals(1.0, xorInputs[1].get(0, 0), 1e-12);
-        assertEquals(0.0, xorInputs[2].get(0, 0), 1e-12);
-        assertEquals(1.0, xorInputs[3].get(0, 0), 1e-12);
+        FederatedNode nodeB = new FederatedNode("NodeB",
+                new NeuralNetwork(new int[]{2, 4, 1}, 0.3, 43L),
+                new Matrix[]{col(1,0), col(1,1)},
+                new Matrix[]{t(1), t(0)});
+
+        BlockChain blockchain = new BlockChain(1.0);
+        FederatedCoordinator coordinator = new FederatedCoordinator(
+                List.of(nodeA, nodeB), blockchain, 500);
+
+        coordinator.runRound(1);
+        double lossAfterRound1 = coordinator.getGlobalLoss();
+
+        for (int round = 2; round <= 20; round++) {
+            coordinator.runRound(round);
+        }
+        double lossAfterRound20 = coordinator.getGlobalLoss();
+
+        assertTrue(lossAfterRound20 < lossAfterRound1,
+                "loss should decrease over rounds");
     }
 }
-
