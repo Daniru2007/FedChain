@@ -36,6 +36,8 @@ NeuralNetwork(int[] layerSizes, double learningRate)
 - `train(Matrix input, Matrix target)` — single example training (MSE loss, sigmoid activation, backprop)
 - `predict(Matrix input)` — forward pass only, no weight updates
 - `randomizeWeights()` — reinitialize weights and biases
+- `getLoss()` / `getLoss(Matrix input, Matrix target)` — inspect the most recent or current MSE
+- `save(String path)` / `load(String path)` — persist and restore the network
 
 ### Input Format
 - Inputs must be column vectors: shape (inputSize, 1)
@@ -56,6 +58,22 @@ nn.train(input, target);
 Matrix output = nn.predict(input);
 ```
 
+### Saving Models
+
+If you call:
+
+```java
+nn.save("my-network.bin");
+```
+
+the file is written to:
+
+```text
+<project-root>/models/my-network.bin
+```
+
+Absolute paths and paths that already include directories are saved exactly where you specify.
+
 ## Run tests
 
 ```bash
@@ -68,4 +86,5 @@ mvn test
 - Backpropagation uses Mean Squared Error (MSE) cost function.
 - Currently supports single-example training; extend for minibatch SGD if needed.
 - Random initialization uses Gaussian distribution (stddev 0.01). Consider Xavier/He for deeper networks.
+- Binary model files are stored under `models/` by default when you pass a bare filename.
 

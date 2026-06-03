@@ -4,6 +4,8 @@ import math.Matrix;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class NeuralNetworkTest {
@@ -58,6 +60,48 @@ class NeuralNetworkTest {
         double after = mse(nn.predict(input), target);
 
         assertTrue(after < before, "MSE should decrease after training");
+    }
+
+    @Test
+    void saveAndLoadPreservePredictions() throws Exception {
+        NeuralNetwork nn = new NeuralNetwork(new int[]{2, 3, 1}, 0.1);
+        Matrix input = new Matrix(new double[][]{{0.2}, {0.8}});
+        Matrix p1 = nn.predict(input);
+
+        java.nio.file.Path tmp = java.nio.file.Files.createTempFile("nn", ".bin");
+        String path = tmp.toAbsolutePath().toString();
+        nn.save(path);
+
+        NeuralNetwork nn2 = NeuralNetwork.load(path);
+        Matrix p2 = nn2.predict(input);
+        assertEquals(p1.get(0, 0), p2.get(0, 0), 1e-12);
+    }
+
+    @Test
+    void saveBareNameGoesIntoModelsDirectory() throws Exception {
+        NeuralNetwork nn = new NeuralNetwork(new int[]{1, 1}, 0.1);
+        java.nio.file.Path modelsDir = java.nio.file.Paths.get(System.getProperty("user.dir"), "models");
+        java.nio.file.Files.createDirectories(modelsDir);
+        java.nio.file.Path file = modelsDir.resolve("test-model.bin");
+        java.nio.file.Files.deleteIfExists(file);
+
+        nn.save("test-model.bin");
+
+        assertTrue(java.nio.file.Files.exists(file));
+        assertTrue(java.nio.file.Files.size(file) > 0);
+    }
+
+    @Test
+    void loadFromExplicitPathStillWorks() throws Exception {
+        NeuralNetwork nn = new NeuralNetwork(new int[]{1, 1}, 0.1);
+        java.nio.file.Path tmp = java.nio.file.Files.createTempFile("nn-explicit", ".bin");
+        nn.save(tmp.toString());
+
+        NeuralNetwork loaded = NeuralNetwork.load(tmp.toString());
+        assertNotNull(loaded);
+
+        Matrix input = new Matrix(new double[][]{{0.4}});
+        assertEquals(nn.predict(input).get(0, 0), loaded.predict(input).get(0, 0), 1e-12);
     }
 }
 
