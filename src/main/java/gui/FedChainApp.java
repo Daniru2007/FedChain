@@ -29,6 +29,20 @@ public class FedChainApp extends JFrame {
         tabbedPane.addTab("Live Dashboard", createDashboardPanel());
 
         add(tabbedPane);
+        
+        // Forcefully apply font to all components
+        setGlobalFont(this, new Font("SansSerif", Font.PLAIN, 14));
+    }
+    
+    private static void setGlobalFont(Component comp, Font font) {
+        if (!(comp instanceof JTextArea)) { // Keep logArea monospaced
+            comp.setFont(font);
+        }
+        if (comp instanceof Container) {
+            for (Component child : ((Container) comp).getComponents()) {
+                setGlobalFont(child, font);
+            }
+        }
     }
 
     private JPanel createJoinPanel() {
