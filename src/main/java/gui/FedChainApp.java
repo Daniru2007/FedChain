@@ -25,7 +25,9 @@ import ml.Evaluator;
 
 public class FedChainApp extends JFrame {
 
-    private final String bootstrapUrl = "http://localhost:9000";
+    private final String bootstrapUrl = System.getenv("FEDCHAIN_HUB_URL") != null 
+        ? System.getenv("FEDCHAIN_HUB_URL") 
+        : "http://localhost:9000";
     private JTextArea logArea;
     private JLabel accuracyLabel;
     private final Gson gson = new Gson();

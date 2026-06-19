@@ -1,0 +1,9 @@
+version: '3.8'
+services:
+  fedchain-hub:
+    build: .
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./bootstrap_data:/app/bootstrap_data
+    restart: always
