@@ -54,17 +54,12 @@ public class AsyncTrainingNode {
                 gossipNode.processLocally(msg);
                 gossipNode.broadcast(msg);
                 
-                // Pause training until the next global model arrives safely
-                try {
-                    synchronized (this) {
-                        while (!modelUpdated && training) {
-                            wait(); 
-                        }
-                        modelUpdated = false; // Reset for the next round
-                    }
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
+                // TRUE ASYNCHRONOUS FL:
+                // We do NOT wait for the network to reach consensus!
+                // We immediately loop back and start the next epoch on our current local model.
+                // When the network eventually completes a merge, onNewGlobalModel() will be triggered
+                // in the background, which will asynchronously overwrite our weights mid-stride!
+                System.out.println("[" + coreNode.getNodeId() + "] Proceeding to next epoch continuously...");
             }
         });
         trainingThread.start();
