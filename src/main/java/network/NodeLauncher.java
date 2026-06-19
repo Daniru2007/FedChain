@@ -21,6 +21,7 @@ public class NodeLauncher {
 
     private final String nodeId;
     private final Role role;
+    private final int port;
     private final GossipNode gossipNode;
     private final AsyncTrainingNode trainingNode;
     private final AsyncValidatorNode validatorNode;
@@ -33,6 +34,7 @@ public class NodeLauncher {
         
         this.nodeId = nodeId;
         this.role = role;
+        this.port = port;
         
         // Networking core
         PeerList peerList = new PeerList();
@@ -75,6 +77,13 @@ public class NodeLauncher {
         // Start TCP server
         gossipNode.start();
         
+        // Broadcast HELLO to announce ourselves to the network
+        // This is CRITICAL because otherwise earlier nodes have empty peer lists!
+        network.HelloPayload hello = new network.HelloPayload("127.0.0.1", this.port);
+        com.google.gson.Gson gson = new com.google.gson.Gson();
+        network.GossipMessage helloMsg = new network.GossipMessage(network.MessageType.HELLO, nodeId, gson.toJson(hello));
+        gossipNode.broadcast(helloMsg);
+        
         // Sync chain to make sure we have latest
         chainSync.requestChains();
 
@@ -83,7 +92,7 @@ public class NodeLauncher {
             trainingNode.startTraining();
         }
         
-        System.out.println(">>> Node " + nodeId + " (" + role + ") started and listening on port " + gossipNode.getNodeId());
+        System.out.println(">>> Node " + nodeId + " (" + role + ") started and listening on port " + this.port);
     }
 
     public void stop() {
