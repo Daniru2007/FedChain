@@ -26,6 +26,8 @@ public class GossipNode {
     private static final int GOSSIP_FANOUT = 3;
 
     private final String nodeId;
+    private final String modelId;
+    private final String myIp;
     private final int port;
     private final PeerList peerList;
     private final Gson gson;
@@ -49,7 +51,13 @@ public class GossipNode {
     private volatile boolean running = false;
 
     public GossipNode(String nodeId, int port, PeerList peerList) {
+        this(nodeId, "mnist-run-001", "127.0.0.1", port, peerList);
+    }
+
+    public GossipNode(String nodeId, String modelId, String myIp, int port, PeerList peerList) {
         this.nodeId = nodeId;
+        this.modelId = modelId;
+        this.myIp = myIp;
         this.port = port;
         this.peerList = peerList;
         this.gson = new GsonBuilder().create();
@@ -99,9 +107,22 @@ public class GossipNode {
 
             GossipMessage msg = gson.fromJson(json, GossipMessage.class);
 
+            // Network Segmentation: Ignore messages for other models
+            if (!msg.getModelId().equals(this.modelId)) {
+                return;
+            }
+
             // Deduplication: if we've seen this message ID, ignore it (breaks gossip loops)
             if (seenMessages.putIfAbsent(msg.getMessageId(), true) != null) {
                 return;
+            }
+
+            // If it's a HELLO message, parse the payload and add the new peer
+            if (msg.getType() == MessageType.HELLO) {
+                HelloPayload hello = gson.fromJson(msg.getPayload(), HelloPayload.class);
+                Peer newPeer = new Peer(msg.getSenderId(), hello.ipAddress, hello.port);
+                peerList.addPeer(newPeer);
+                System.out.println("[" + nodeId + "] Discovered new peer: " + newPeer.getNodeId() + " (" + newPeer.getHost() + ":" + newPeer.getPort() + ")");
             }
 
             // Update peer last seen (the sender is alive)

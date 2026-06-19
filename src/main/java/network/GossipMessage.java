@@ -9,12 +9,18 @@ import java.util.UUID;
  */
 public class GossipMessage {
     private final String messageId;
+    private final String modelId;
     private final MessageType type;
     private final String senderId;
     private final long timestamp;
     private final String payload; // JSON serialized payload
 
     public GossipMessage(MessageType type, String senderId, String payload) {
+        this("mnist-run-001", type, senderId, payload);
+    }
+
+    public GossipMessage(String modelId, MessageType type, String senderId, String payload) {
+        this.modelId = Objects.requireNonNull(modelId);
         this.type = Objects.requireNonNull(type);
         this.senderId = Objects.requireNonNull(senderId);
         this.timestamp = System.currentTimeMillis();
@@ -27,6 +33,10 @@ public class GossipMessage {
 
     public String getMessageId() {
         return messageId;
+    }
+
+    public String getModelId() {
+        return modelId;
     }
 
     public MessageType getType() {
