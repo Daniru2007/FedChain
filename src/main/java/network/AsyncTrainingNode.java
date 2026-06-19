@@ -19,6 +19,7 @@ public class AsyncTrainingNode {
     private final Gson gson;
     
     private volatile boolean training = false;
+    private volatile boolean modelUpdated = false;
     private Thread trainingThread;
 
     public AsyncTrainingNode(FederatedNode coreNode, GossipNode gossipNode, int epochsPerRound) {
@@ -48,11 +49,13 @@ public class AsyncTrainingNode {
                 GossipMessage msg = new GossipMessage(MessageType.WEIGHT_UPDATE, coreNode.getNodeId(), payload);
                 gossipNode.broadcast(msg);
                 
-                // Pause training until the next global model arrives to avoid spamming the network
-                // with updates based on the exact same base model
+                // Pause training until the next global model arrives safely
                 try {
                     synchronized (this) {
-                        wait(); 
+                        while (!modelUpdated && training) {
+                            wait(); 
+                        }
+                        modelUpdated = false; // Reset for the next round
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -75,6 +78,7 @@ public class AsyncTrainingNode {
     public synchronized void onNewGlobalModel(Matrix[] newWeights) {
         System.out.println("[" + coreNode.getNodeId() + "] Received new global model. Updating and restarting training.");
         coreNode.setWeights(newWeights);
+        modelUpdated = true;
         notify(); // Wake up the training thread
     }
     

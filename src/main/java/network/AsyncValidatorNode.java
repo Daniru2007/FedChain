@@ -43,6 +43,10 @@ public class AsyncValidatorNode {
         this.currentGlobalModel = Objects.requireNonNull(initialGlobalModel).copy();
         this.gson = new GsonBuilder().create();
     }
+    
+    public NeuralNetwork getCurrentGlobalModel() {
+        return currentGlobalModel;
+    }
 
     /**
      * Updates the baseline model when a MERGE_COMPLETE occurs.

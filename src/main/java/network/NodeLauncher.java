@@ -94,4 +94,8 @@ public class NodeLauncher {
     public AsyncTrainingNode getTrainingNode() {
         return trainingNode;
     }
+
+    public AsyncValidatorNode getValidatorNode() {
+        return validatorNode;
+    }
 }

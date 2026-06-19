@@ -21,11 +21,13 @@ import java.nio.file.Path;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
+import ml.Evaluator;
 
 public class FedChainApp extends JFrame {
 
     private final String bootstrapUrl = "http://localhost:9000";
     private JTextArea logArea;
+    private JLabel accuracyLabel;
     private final Gson gson = new Gson();
     
     // File references for upload
@@ -107,17 +109,34 @@ public class FedChainApp extends JFrame {
                     Path tempDir = Files.createTempDirectory("fedchain_" + UUID.randomUUID());
                     Matrix[] images, labels;
 
+                    // Always download Test Data so we can compute Global Accuracy for the Dashboard!
+                    downloadFile(modelId, "testImages.gz", tempDir.resolve("testImages.gz"));
+                    downloadFile(modelId, "testLabels.gz", tempDir.resolve("testLabels.gz"));
+                    Matrix[] testImages = MNISTLoader.loadImages(tempDir.resolve("testImages.gz").toString());
+                    Matrix[] testLabels = MNISTLoader.loadLabels(tempDir.resolve("testLabels.gz").toString());
+
                     if (role == NodeLauncher.Role.TRAINER) {
                         downloadFile(modelId, "trainImages.gz", tempDir.resolve("images.gz"));
                         downloadFile(modelId, "trainLabels.gz", tempDir.resolve("labels.gz"));
+                        
+                        Matrix[] fullTrainImages = MNISTLoader.loadImages(tempDir.resolve("images.gz").toString());
+                        Matrix[] fullTrainLabels = MNISTLoader.loadLabels(tempDir.resolve("labels.gz").toString());
+                        
+                        // FIX: Slice the dataset randomly so each trainer gets UNIQUE data (federated simulation)
+                        int subsetSize = 5000;
+                        images = new Matrix[subsetSize];
+                        labels = new Matrix[subsetSize];
+                        java.util.Random rnd = new java.util.Random();
+                        for(int i = 0; i < subsetSize; i++) {
+                            int idx = rnd.nextInt(fullTrainImages.length);
+                            images[i] = fullTrainImages[idx];
+                            labels[i] = fullTrainLabels[idx];
+                        }
+                        System.out.println("Sliced a unique subset of " + subsetSize + " images for training.");
                     } else {
-                        downloadFile(modelId, "testImages.gz", tempDir.resolve("images.gz"));
-                        downloadFile(modelId, "testLabels.gz", tempDir.resolve("labels.gz"));
+                        images = testImages;
+                        labels = testLabels;
                     }
-
-                    System.out.println("Loading downloaded data into memory...");
-                    images = MNISTLoader.loadImages(tempDir.resolve("images.gz").toString());
-                    labels = MNISTLoader.loadLabels(tempDir.resolve("labels.gz").toString());
 
                     String myNodeId = "Node_" + UUID.randomUUID().toString().substring(0, 5);
                     int myPort = 8000 + (int)(Math.random() * 1000); // Random port for demo
@@ -139,6 +158,26 @@ public class FedChainApp extends JFrame {
                     
                     activeNode.start();
                     System.out.println("NODE SUCCESSFULLY JOINED THE NETWORK!");
+                    
+                    // Background thread to continuously update the Global Accuracy Label
+                    new Thread(() -> {
+                        while (true) {
+                            try {
+                                Thread.sleep(5000);
+                                NeuralNetwork currentModel = null;
+                                if (role == NodeLauncher.Role.TRAINER && activeNode.getTrainingNode() != null) {
+                                    currentModel = activeNode.getTrainingNode().getCoreNode().getLocalModel();
+                                } else if (role == NodeLauncher.Role.VALIDATOR && activeNode.getValidatorNode() != null) {
+                                    currentModel = activeNode.getValidatorNode().getCurrentGlobalModel();
+                                }
+                                
+                                if (currentModel != null) {
+                                    double acc = Evaluator.evaluate(currentModel, testImages, testLabels);
+                                    SwingUtilities.invokeLater(() -> accuracyLabel.setText(String.format("  Global Accuracy: %.2f%%  ", acc * 100)));
+                                }
+                            } catch (Exception ignore) {}
+                        }
+                    }).start();
 
                 } catch (Exception ex) {
                     System.out.println("Error joining network: " + ex.getMessage());
@@ -242,6 +281,14 @@ public class FedChainApp extends JFrame {
         logArea.setBackground(Color.BLACK);
         logArea.setForeground(Color.GREEN);
         logArea.setFont(new Font("Monospaced", Font.PLAIN, 14));
+        
+        accuracyLabel = new JLabel("  Global Accuracy: --%  ");
+        JPanel statsPanel = new JPanel(new GridLayout(1, 3));
+        statsPanel.add(new JLabel("  Node Status: ONLINE  "));
+        statsPanel.add(new JLabel("  Peers: Active  "));
+        statsPanel.add(accuracyLabel);
+        
+        panel.add(statsPanel, BorderLayout.NORTH);
         panel.add(new JScrollPane(logArea), BorderLayout.CENTER);
         return panel;
     }
