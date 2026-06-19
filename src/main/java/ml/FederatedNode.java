@@ -68,24 +68,10 @@ public class FederatedNode {
         }
         double sum = 0.0;
         for (int i = 0; i < localInputs.length; i++) {
-            Matrix out = localModel.predict(localInputs[i]);
-            sum += mse(out, localTargets[i]);
+            sum += localModel.getLoss(localInputs[i], localTargets[i]);
         }
         lastLoss = sum / localInputs.length;
         return lastLoss;
-    }
-
-    private static double mse(Matrix a, Matrix b) {
-        double[][] da = a.getData();
-        double[][] db = b.getData();
-        double sum = 0.0;
-        for (int i = 0; i < da.length; i++) {
-            for (int j = 0; j < da[i].length; j++) {
-                double d = da[i][j] - db[i][j];
-                sum += d * d;
-            }
-        }
-        return sum / Math.max(1, da.length * (da.length == 0 ? 0 : da[0].length));
     }
 
     private static Matrix[] copyArray(Matrix[] source) {

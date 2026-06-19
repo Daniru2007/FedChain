@@ -21,22 +21,25 @@ class FederatedCoordinatorTest {
 
     @Test
     void runRoundAddsAcceptedBlocksAndSynchronizesModels() {
+        Matrix oh0 = new Matrix(new double[][]{{1.0}, {0.0}}); // one-hot class 0
+        Matrix oh1 = new Matrix(new double[][]{{0.0}, {1.0}}); // one-hot class 1
+
         FederatedNode nodeA = new FederatedNode("NodeA",
-                new NeuralNetwork(new int[]{2, 4, 1}, 0.3, 1L),
+                new NeuralNetwork(new int[]{2, 4, 2}, 0.3, 1L),
                 new Matrix[]{col(0,0), col(0,1)},
-                new Matrix[]{t(0), t(1)});
+                new Matrix[]{oh0, oh1});
 
         FederatedNode nodeB = new FederatedNode("NodeB",
-                new NeuralNetwork(new int[]{2, 4, 1}, 0.3, 2L),
+                new NeuralNetwork(new int[]{2, 4, 2}, 0.3, 2L),
                 new Matrix[]{col(1,0)},
-                new Matrix[]{t(1)});
+                new Matrix[]{oh1});
 
         FederatedNode nodeC = new FederatedNode("NodeC",
-                new NeuralNetwork(new int[]{2, 4, 1}, 0.3, 3L),
+                new NeuralNetwork(new int[]{2, 4, 2}, 0.3, 3L),
                 new Matrix[]{col(1,1)},
-                new Matrix[]{t(0)});
+                new Matrix[]{oh0});
 
-        BlockChain blockchain = new BlockChain(0.5);
+        BlockChain blockchain = new BlockChain(10.0);
         FederatedCoordinator coordinator = new FederatedCoordinator(
                 List.of(nodeA, nodeB, nodeC), blockchain, 10);
 
@@ -54,17 +57,20 @@ class FederatedCoordinatorTest {
 
     @Test
     void blockchainRemainsValidAcrossMultipleRounds() {
+        Matrix oh0 = new Matrix(new double[][]{{1.0}, {0.0}});
+        Matrix oh1 = new Matrix(new double[][]{{0.0}, {1.0}});
+
         FederatedNode nodeA = new FederatedNode("NodeA",
-                new NeuralNetwork(new int[]{2, 4, 1}, 0.3, 11L),
+                new NeuralNetwork(new int[]{2, 4, 2}, 0.3, 11L),
                 new Matrix[]{col(0,0), col(0,1)},
-                new Matrix[]{t(0), t(1)});
+                new Matrix[]{oh0, oh1});
 
         FederatedNode nodeB = new FederatedNode("NodeB",
-                new NeuralNetwork(new int[]{2, 4, 1}, 0.3, 12L),
+                new NeuralNetwork(new int[]{2, 4, 2}, 0.3, 12L),
                 new Matrix[]{col(1,0), col(1,1)},
-                new Matrix[]{t(1), t(0)});
+                new Matrix[]{oh1, oh0});
 
-        BlockChain blockchain = new BlockChain(1.0);
+        BlockChain blockchain = new BlockChain(10.0);
         FederatedCoordinator coordinator = new FederatedCoordinator(
                 List.of(nodeA, nodeB), blockchain, 5);
 
@@ -79,17 +85,20 @@ class FederatedCoordinatorTest {
 
     @Test
     void lossDecreasesAfterMultipleRounds() {
+        Matrix oh0 = new Matrix(new double[][]{{1.0}, {0.0}});
+        Matrix oh1 = new Matrix(new double[][]{{0.0}, {1.0}});
+
         FederatedNode nodeA = new FederatedNode("NodeA",
-                new NeuralNetwork(new int[]{2, 4, 1}, 0.3, 42L),
+                new NeuralNetwork(new int[]{2, 4, 2}, 0.3, 42L),
                 new Matrix[]{col(0,0), col(0,1)},
-                new Matrix[]{t(0), t(1)});
+                new Matrix[]{oh0, oh1});
 
         FederatedNode nodeB = new FederatedNode("NodeB",
-                new NeuralNetwork(new int[]{2, 4, 1}, 0.3, 43L),
+                new NeuralNetwork(new int[]{2, 4, 2}, 0.3, 43L),
                 new Matrix[]{col(1,0), col(1,1)},
-                new Matrix[]{t(1), t(0)});
+                new Matrix[]{oh1, oh0});
 
-        BlockChain blockchain = new BlockChain(1.0);
+        BlockChain blockchain = new BlockChain(10.0);
         FederatedCoordinator coordinator = new FederatedCoordinator(
                 List.of(nodeA, nodeB), blockchain, 500);
 

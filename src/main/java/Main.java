@@ -1,79 +1,98 @@
 import blockchain.BlockChain;
 import math.Matrix;
-import ml.FederatedCoordinator;
-import ml.FederatedNode;
-import ml.NeuralNetwork;
+import ml.*;
 
+import java.util.Arrays;
 import java.util.List;
 
 public class Main {
-    public static void main(String[] args) {
-        Matrix[] inputs = {
-                new Matrix(new double[][]{{0.0}, {0.0}}),
-                new Matrix(new double[][]{{0.0}, {1.0}}),
-                new Matrix(new double[][]{{1.0}, {0.0}}),
-                new Matrix(new double[][]{{1.0}, {1.0}})
-        };
-        Matrix[] targets = {
-                new Matrix(new double[][]{{0.0}}),
-                new Matrix(new double[][]{{1.0}}),
-                new Matrix(new double[][]{{1.0}}),
-                new Matrix(new double[][]{{0.0}})
-        };
 
-        Matrix[] inputsA = {inputs[0], inputs[1]};
-        Matrix[] targetsA = {targets[0], targets[1]};
+    // -----------------------------------------------------------------------
+    // Configuration
+    // -----------------------------------------------------------------------
+    /** Path to the directory containing the four raw MNIST IDX files. */
+    private static final String MNIST_DIR = "data/mnist";
 
-        Matrix[] inputsB = {inputs[2]};
-        Matrix[] targetsB = {targets[2]};
+    private static final String TRAIN_IMAGES = MNIST_DIR + "/train-images-idx3-ubyte.gz";
+    private static final String TRAIN_LABELS = MNIST_DIR + "/train-labels-idx1-ubyte.gz";
+    private static final String TEST_IMAGES  = MNIST_DIR + "/t10k-images-idx3-ubyte.gz";
+    private static final String TEST_LABELS  = MNIST_DIR + "/t10k-labels-idx1-ubyte.gz";
 
-        Matrix[] inputsC = {inputs[3]};
-        Matrix[] targetsC = {targets[3]};
+    /** Number of federated rounds. */
+    private static final int ROUNDS = 10;
 
-        Matrix[] inputsD = inputs;
-        Matrix[] targetsD = targets;
+    /** Local epochs each node trains per round. */
+    private static final int EPOCHS_PER_ROUND = 1;
 
-        FederatedNode nodeA = new FederatedNode(
-                "NodeA",
-                new NeuralNetwork(new int[]{2, 4, 1}, 0.3, 42L),
-                inputsA, targetsA
-        );
-        FederatedNode nodeB = new FederatedNode(
-                "NodeB",
-                new NeuralNetwork(new int[]{2, 4, 1}, 0.3, 43L),
-                inputsB, targetsB
-        );
-        FederatedNode nodeC = new FederatedNode(
-                "NodeC",
-                new NeuralNetwork(new int[]{2, 4, 1}, 0.3, 44L),
-                inputsC, targetsC
-        );
-        FederatedNode nodeD = new FederatedNode(
-                "NodeD",
-                new NeuralNetwork(new int[]{2, 4, 1}, 0.3, 45L),
-                inputsD, targetsD
-        );
+    /** Network architecture: 784 inputs → 128 hidden → 64 hidden → 10 outputs. */
+    private static final int[] ARCHITECTURE = {784, 128, 64, 10};
 
-        BlockChain blockchain = new BlockChain(0.30);
-        FederatedCoordinator coordinator = new FederatedCoordinator(List.of(nodeA, nodeB, nodeC, nodeD), blockchain, 1000);
+    private static final double LEARNING_RATE = 0.01;
+    private static final int    NUM_NODES     = 4;
 
-        for (int round = 1; round <= 20; round++) {
+    // -----------------------------------------------------------------------
+
+    public static void main(String[] args) throws Exception {
+        System.out.println("=== FedChain V2 — MNIST Federated Learning ===\n");
+
+        // ── Load data ──────────────────────────────────────────────────────
+        System.out.println("Loading MNIST training data…");
+        Matrix[] trainImages = MNISTLoader.loadImages(TRAIN_IMAGES);
+        Matrix[] trainLabels = MNISTLoader.loadLabels(TRAIN_LABELS);
+        System.out.printf("  Training samples : %,d%n", trainImages.length);
+
+        System.out.println("Loading MNIST test data…");
+        Matrix[] testImages = MNISTLoader.loadImages(TEST_IMAGES);
+        Matrix[] testLabels = MNISTLoader.loadLabels(TEST_LABELS);
+        System.out.printf("  Test samples     : %,d%n%n", testImages.length);
+
+        // ── Partition training data across nodes ───────────────────────────
+        int total     = trainImages.length;
+        int chunkSize = total / NUM_NODES;
+
+        FederatedNode[] nodes = new FederatedNode[NUM_NODES];
+        for (int n = 0; n < NUM_NODES; n++) {
+            int from = n * chunkSize;
+            int to   = (n == NUM_NODES - 1) ? total : from + chunkSize;
+
+            Matrix[] nodeImages = Arrays.copyOfRange(trainImages, from, to);
+            Matrix[] nodeLabels = Arrays.copyOfRange(trainLabels, from, to);
+
+            nodes[n] = new FederatedNode(
+                    "Node" + (char) ('A' + n),
+                    new NeuralNetwork(ARCHITECTURE, LEARNING_RATE, 42L + n),
+                    nodeImages,
+                    nodeLabels
+            );
+            System.out.printf("Node%c  → samples [%,d – %,d) (%,d samples)%n",
+                    (char) ('A' + n), from, to, to - from);
+        }
+        System.out.println();
+
+        // ── Blockchain + coordinator ───────────────────────────────────────
+        BlockChain blockchain   = new BlockChain(/* lossThreshold */ 5.0);
+        FederatedCoordinator coordinator =
+                new FederatedCoordinator(List.of(nodes), blockchain, EPOCHS_PER_ROUND);
+
+        // ── Federated training ─────────────────────────────────────────────
+        // Grab the global model reference from any node for evaluation.
+        // After each round, all nodes share the same averaged weights.
+        for (int round = 1; round <= ROUNDS; round++) {
             coordinator.runRound(round);
             coordinator.printRoundSummary(round);
+
+            // Evaluate the global model on the test set after each round
+            NeuralNetwork globalModel = nodes[0].getLocalModel();
+            double accuracy = Evaluator.evaluate(globalModel, testImages, testLabels);
+            System.out.printf("  ▶ Test accuracy after round %d: %.2f%%%n%n",
+                    round, accuracy * 100.0);
         }
 
-        NeuralNetwork finalModel = nodeD.getLocalModel();
-        System.out.println("\nFinal Predictions:");
-        for (int i = 0; i < inputs.length; i++) {
-            double prediction = finalModel.predict(inputs[i]).get(0, 0);
-            System.out.printf("[%.0f,%.0f] → %.2f %s%n",
-                    inputs[i].get(0, 0),
-                    inputs[i].get(1, 0),
-                    prediction,
-                    ((prediction < 0.2 && targets[i].get(0, 0) == 0.0) || (prediction > 0.8 && targets[i].get(0, 0) == 1.0)) ? "✅" : "");
-        }
-
-        System.out.println("\nBlockchain valid: " + blockchain.isChainValid());
-        System.out.println("Total blocks: " + blockchain.getChain().size());
+        // ── Final summary ──────────────────────────────────────────────────
+        NeuralNetwork finalModel = nodes[0].getLocalModel();
+        double finalAccuracy = Evaluator.evaluate(finalModel, testImages, testLabels);
+        System.out.printf("=== Final Test Accuracy : %.2f%% ===%n", finalAccuracy * 100.0);
+        System.out.println("Blockchain valid        : " + blockchain.isChainValid());
+        System.out.println("Total blocks            : " + blockchain.getChain().size());
     }
 }

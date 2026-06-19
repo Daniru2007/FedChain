@@ -95,17 +95,37 @@ public class Matrix {
 		}
 
 		double[][] result = new double[rows][b.cols];
-		for (int i = 0; i < rows; i++) {
-			for (int j = 0; j < b.cols; j++) {
+		if (b.cols == 1) {
+			// Column vector optimization to avoid inner-loop 2D array pointer dereferencing
+			double[] bCol = new double[cols];
+			for (int k = 0; k < cols; k++) {
+				bCol[k] = b.data[k][0];
+			}
+			for (int i = 0; i < rows; i++) {
 				double sum = 0.0;
+				double[] rowData = data[i];
 				for (int k = 0; k < cols; k++) {
-					sum += data[i][k] * b.data[k][j];
+					sum += rowData[k] * bCol[k];
 				}
-				result[i][j] = sum;
+				result[i][0] = sum;
+			}
+		} else {
+			// Cache-friendly general matrix multiplication
+			for (int i = 0; i < rows; i++) {
+				double[] rowA = data[i];
+				double[] rowRes = result[i];
+				for (int k = 0; k < cols; k++) {
+					double valA = rowA[k];
+					double[] rowB = b.data[k];
+					for (int j = 0; j < b.cols; j++) {
+						rowRes[j] += valA * rowB[j];
+					}
+				}
 			}
 		}
 		return new Matrix(result);
 	}
+
 
 	public Matrix transpose() {
 		double[][] result = new double[cols][rows];

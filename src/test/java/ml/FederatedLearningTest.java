@@ -31,12 +31,13 @@ class FederatedLearningTest {
 
     @Test
     void federatedNodeTrainsAndReportsLoss() {
-        NeuralNetwork model = new NeuralNetwork(new int[]{1, 1}, 0.5, 42L);
+        // 2-output network: class 0 = [1,0], class 1 = [0,1]
+        NeuralNetwork model = new NeuralNetwork(new int[]{1, 2}, 0.5, 42L);
         FederatedNode node = new FederatedNode(
                 "NodeA",
                 model,
-                new Matrix[]{m(0.0)},
-                new Matrix[]{m(0.0)}
+                new Matrix[]{new Matrix(new double[][]{{0.0}})},
+                new Matrix[]{new Matrix(new double[][]{{1.0}, {0.0}})} // class 0
         );
 
         double before = node.getLoss();

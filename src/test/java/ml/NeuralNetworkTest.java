@@ -48,18 +48,19 @@ class NeuralNetworkTest {
     }
 
     @Test
-    void trainReducesMseForSingleZeroExample() {
-        NeuralNetwork nn = new NeuralNetwork(new int[]{1, 1}, 1.0);
-        Matrix input = new Matrix(new double[][]{{0.0}});
-        Matrix target = new Matrix(new double[][]{{0.0}});
+    void trainReducesLossForSingleExample() {
+        // 2-output network so softmax has 2 classes: [1,0] and [0,1]
+        NeuralNetwork nn = new NeuralNetwork(new int[]{1, 2}, 1.0);
+        Matrix input  = new Matrix(new double[][]{{0.0}});
+        Matrix target = new Matrix(new double[][]{{1.0}, {0.0}}); // class 0
 
-        double before = mse(nn.predict(input), target);
+        double before = nn.getLoss(input, target);
         for (int i = 0; i < 20; i++) {
             nn.train(input, target);
         }
-        double after = mse(nn.predict(input), target);
+        double after = nn.getLoss(input, target);
 
-        assertTrue(after < before, "MSE should decrease after training");
+        assertTrue(after < before, "Cross-entropy loss should decrease after training");
     }
 
     @Test
@@ -106,23 +107,25 @@ class NeuralNetworkTest {
 
     @Test
     void xorDemoLearnsTheXorPattern() {
-        NeuralNetwork nn = new NeuralNetwork(new int[]{2, 4, 1}, 0.5, 42L);
+        // XOR reframed as 2-class softmax: class 0 = XOR false, class 1 = XOR true
+        NeuralNetwork nn = new NeuralNetwork(new int[]{2, 8, 2}, 0.1, 42L);
         Matrix[] inputs = {
                 new Matrix(new double[][]{{0.0}, {0.0}}),
                 new Matrix(new double[][]{{0.0}, {1.0}}),
                 new Matrix(new double[][]{{1.0}, {0.0}}),
                 new Matrix(new double[][]{{1.0}, {1.0}})
         };
+        // one-hot: [1,0] = false (XOR=0), [0,1] = true (XOR=1)
         Matrix[] targets = {
-                new Matrix(new double[][]{{0.0}}),
-                new Matrix(new double[][]{{1.0}}),
-                new Matrix(new double[][]{{1.0}}),
-                new Matrix(new double[][]{{0.0}})
+                new Matrix(new double[][]{{1.0}, {0.0}}),
+                new Matrix(new double[][]{{0.0}, {1.0}}),
+                new Matrix(new double[][]{{0.0}, {1.0}}),
+                new Matrix(new double[][]{{1.0}, {0.0}})
         };
 
         double initialLoss = 0.0;
         for (int i = 0; i < inputs.length; i++) {
-            initialLoss += mse(nn.predict(inputs[i]), targets[i]);
+            initialLoss += nn.getLoss(inputs[i], targets[i]);
         }
         initialLoss /= inputs.length;
 
@@ -133,20 +136,21 @@ class NeuralNetworkTest {
         }
 
         double finalLoss = 0.0;
-        double[] predictions = new double[4];
         for (int i = 0; i < inputs.length; i++) {
-            Matrix out = nn.predict(inputs[i]);
-            predictions[i] = out.get(0, 0);
-            finalLoss += mse(out, targets[i]);
+            finalLoss += nn.getLoss(inputs[i], targets[i]);
         }
         finalLoss /= inputs.length;
 
-        assertTrue(finalLoss < initialLoss, "XOR training should reduce loss");
-        assertTrue(finalLoss < 0.15, "XOR demo should get reasonably low error");
-        assertTrue(predictions[0] < 0.4);
-        assertTrue(predictions[1] > 0.6);
-        assertTrue(predictions[2] > 0.6);
-        assertTrue(predictions[3] < 0.4);
+        assertTrue(finalLoss < initialLoss, "XOR training should reduce cross-entropy loss");
+
+        // check argmax predictions: XOR(0,0)=0, XOR(0,1)=1, XOR(1,0)=1, XOR(1,1)=0
+        int[] expectedClass = {0, 1, 1, 0};
+        for (int i = 0; i < inputs.length; i++) {
+            Matrix out = nn.predict(inputs[i]);
+            int predicted = out.get(0, 0) > out.get(1, 0) ? 0 : 1;
+            assertEquals(expectedClass[i], predicted,
+                    "Wrong prediction for input " + i);
+        }
     }
 }
 

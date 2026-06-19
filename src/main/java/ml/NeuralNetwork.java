@@ -40,14 +40,14 @@ public class NeuralNetwork {
 		for (int i = 0; i < layers - 1; i++) {
 			int rows = layerSizes[i + 1];
 			int cols = layerSizes[i];
+			// He initialization: scale = sqrt(2 / fan_in), keeps variance stable through ReLU layers
+			double scale = Math.sqrt(2.0 / cols);
 			double[][] w = new double[rows][cols];
-			double[][] b = new double[rows][1];
-			// small random initialization
+			double[][] b = new double[rows][1]; // biases start at zero
 			for (int r = 0; r < rows; r++) {
 				for (int c = 0; c < cols; c++) {
-					w[r][c] = rnd.nextGaussian() * 0.01;
+					w[r][c] = rnd.nextGaussian() * scale;
 				}
-				b[r][0] = rnd.nextGaussian() * 0.01;
 			}
 			this.weights[i] = new Matrix(w);
 			this.biases[i] = new Matrix(b);
@@ -62,7 +62,12 @@ public class NeuralNetwork {
 		for (int l = 0; l < weights.length; l++) {
 			Matrix z = weights[l].multiply(activation).add(biases[l]);
 			zs[l] = z;
-			activation = z.applyFunction(ActivationFunction::sigmoid);
+			// apply softmax to the output layer, ReLU to all hidden layers
+			if (l == weights.length - 1) {
+				activation = ActivationFunction.softmax(z);
+			} else {
+				activation = z.applyFunction(ActivationFunction::relu);
+			}
 			layerOutputs[l + 1] = activation;
 		}
 		return activation;
@@ -71,29 +76,30 @@ public class NeuralNetwork {
 	public void train(Matrix input, Matrix target) {
 		// forward pass
 		Matrix output = forward(input);
-		// compute and store loss (MSE) before weight update for tracking
-		this.lastLoss = computeMSE(output, target);
-		// compute delta for output layer: delta = (a - y) * sigmoid'(z)
+		this.lastLoss = computeCrossEntropy(output, target);
 		int L = weights.length;
-		Matrix delta = output.subtract(target).elementWiseMultiply(zs[L - 1].applyFunction(ActivationFunction::sigmoidDerivative));
 
-		// gradient for weights[L-1] = delta * a_{L-1}^T
-		Matrix aPrev = layerOutputs[L - 1];
-		Matrix gradW = delta.multiply(aPrev.transpose());
-		weights[L - 1] = weights[L - 1].subtract(gradW.scale(learningRate));
-		biases[L - 1] = biases[L - 1].subtract(delta.scale(learningRate));
+		// ── Phase 1: compute all gradients using the ORIGINAL weights ────────
+		// Output-layer delta: softmax + cross-entropy simplifies to (ŷ - y)
+		Matrix delta = output.subtract(target);
+		Matrix[] gradWeights = new Matrix[L];
+		Matrix[] gradBiases  = new Matrix[L];
 
-		// backpropagate
+		gradWeights[L - 1] = delta.multiply(layerOutputs[L - 1].transpose());
+		gradBiases[L - 1]  = delta;
+
+		// Hidden layers — propagate using the original (not yet updated) weights
 		for (int l = L - 2; l >= 0; l--) {
-			Matrix wNext = weights[l + 1];
-			Matrix z = zs[l];
-			Matrix sp = z.applyFunction(ActivationFunction::sigmoidDerivative);
-			delta = wNext.transpose().multiply(delta).elementWiseMultiply(sp);
+			Matrix sp = zs[l].applyFunction(ActivationFunction::reluDerivative);
+			delta = weights[l + 1].transpose().multiply(delta).elementWiseMultiply(sp);
+			gradWeights[l] = delta.multiply(layerOutputs[l].transpose());
+			gradBiases[l]  = delta;
+		}
 
-			aPrev = layerOutputs[l];
-			gradW = delta.multiply(aPrev.transpose());
-			weights[l] = weights[l].subtract(gradW.scale(learningRate));
-			biases[l] = biases[l].subtract(delta.scale(learningRate));
+		// ── Phase 2: apply all updates ────────────────────────────────────────
+		for (int l = 0; l < L; l++) {
+			weights[l] = weights[l].subtract(gradWeights[l].scale(learningRate));
+			biases[l]  = biases[l].subtract(gradBiases[l].scale(learningRate));
 		}
 	}
 
@@ -101,19 +107,19 @@ public class NeuralNetwork {
 		return forward(input);
 	}
 
-	// Re-randomize weights and biases with small gaussian noise
+	// Re-randomize weights and biases using He initialization
 	public void randomizeWeights() {
 		Random rnd = new Random();
 		for (int i = 0; i < weights.length; i++) {
 			int r = weights[i].getRows();
 			int c = weights[i].getCols();
+			double scale = Math.sqrt(2.0 / c);
 			double[][] w = new double[r][c];
 			double[][] b = new double[r][1];
 			for (int rr = 0; rr < r; rr++) {
 				for (int cc = 0; cc < c; cc++) {
-					w[rr][cc] = rnd.nextGaussian() * 0.01;
+					w[rr][cc] = rnd.nextGaussian() * scale;
 				}
-				b[rr][0] = rnd.nextGaussian() * 0.01;
 			}
 			weights[i] = new Matrix(w);
 			biases[i] = new Matrix(b);
@@ -121,12 +127,12 @@ public class NeuralNetwork {
 	}
 
 	/**
-	 * Compute and return Mean Squared Error for a single input/target pair.
+	 * Compute and return categorical cross-entropy loss for a single input/target pair.
 	 * This runs a forward pass and updates internal activations used by training.
 	 */
 	public double getLoss(Matrix input, Matrix target) {
 		Matrix out = forward(input);
-		lastLoss = computeMSE(out, target);
+		lastLoss = computeCrossEntropy(out, target);
 		return lastLoss;
 	}
 
@@ -169,19 +175,21 @@ public class NeuralNetwork {
 		return new NeuralNetwork(copyMatrices(weights), copyMatrices(biases), learningRate);
 	}
 
-	private static double computeMSE(Matrix a, Matrix b) {
+	/**
+	 * Categorical cross-entropy: L = -sum(y_i * log(ŷ_i)).
+	 * {@code a} is the softmax output, {@code b} is the one-hot target.
+	 * Clamps predictions to [1e-15, 1] to guard against log(0).
+	 */
+	private static double computeCrossEntropy(Matrix a, Matrix b) {
 		double[][] da = a.getData();
 		double[][] db = b.getData();
 		int rows = da.length;
-		int cols = rows == 0 ? 0 : da[0].length;
-		double sum = 0.0;
+		double loss = 0.0;
 		for (int i = 0; i < rows; i++) {
-			for (int j = 0; j < cols; j++) {
-				double d = da[i][j] - db[i][j];
-				sum += d * d;
-			}
+			double pred = Math.max(da[i][0], 1e-15);
+			loss -= db[i][0] * Math.log(pred);
 		}
-		return sum / Math.max(1, rows * cols);
+		return loss;
 	}
 
 	private static Matrix[] copyMatrices(Matrix[] source) {
