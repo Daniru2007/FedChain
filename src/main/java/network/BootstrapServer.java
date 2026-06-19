@@ -105,15 +105,19 @@ public class BootstrapServer {
             JsonObject payload = gson.fromJson(body, JsonObject.class);
             ModelConfig config = gson.fromJson(payload.get("config"), ModelConfig.class);
             
-            String trainDataB64 = payload.get("trainData").getAsString();
-            String testDataB64 = payload.get("testData").getAsString();
+            String trainImg = payload.get("trainImages").getAsString();
+            String trainLbl = payload.get("trainLabels").getAsString();
+            String testImg = payload.get("testImages").getAsString();
+            String testLbl = payload.get("testLabels").getAsString();
 
             // Store datasets locally
             Path modelDir = DATA_DIR.resolve(config.modelId);
             Files.createDirectories(modelDir);
             
-            Files.write(modelDir.resolve("train.zip"), Base64.getDecoder().decode(trainDataB64));
-            Files.write(modelDir.resolve("test.zip"), Base64.getDecoder().decode(testDataB64));
+            Files.write(modelDir.resolve("trainImages.gz"), Base64.getDecoder().decode(trainImg));
+            Files.write(modelDir.resolve("trainLabels.gz"), Base64.getDecoder().decode(trainLbl));
+            Files.write(modelDir.resolve("testImages.gz"), Base64.getDecoder().decode(testImg));
+            Files.write(modelDir.resolve("testLabels.gz"), Base64.getDecoder().decode(testLbl));
 
             activeModels.put(config.modelId, config);
             System.out.println("[REGISTER] New model created: " + config.modelId);
@@ -132,14 +136,14 @@ public class BootstrapServer {
             
             Map<String, String> params = parseQuery(exchange.getRequestURI().getQuery());
             String modelId = params.get("modelId");
-            String type = params.get("type"); // "train" or "test"
+            String type = params.get("type"); // "trainImages.gz", etc.
 
             if (modelId == null || type == null) {
                 sendError(exchange, 400, "Missing modelId or type");
                 return;
             }
 
-            Path file = DATA_DIR.resolve(modelId).resolve(type + ".zip");
+            Path file = DATA_DIR.resolve(modelId).resolve(type);
             if (!Files.exists(file)) {
                 sendError(exchange, 404, "Data not found");
                 return;
