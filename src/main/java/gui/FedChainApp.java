@@ -122,7 +122,7 @@ public class FedChainApp extends JFrame {
         logArea.setEditable(false);
         logArea.setBackground(Color.BLACK);
         logArea.setForeground(Color.GREEN);
-        logArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
+        logArea.setFont(new Font("Monospaced", Font.PLAIN, 14));
         
         JScrollPane scrollPane = new JScrollPane(logArea);
         
@@ -146,6 +146,17 @@ public class FedChainApp extends JFrame {
     public static void main(String[] args) {
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+            
+            // Apply a modern, clean global font
+            Font modernFont = new Font("SansSerif", Font.PLAIN, 14);
+            java.util.Enumeration<Object> keys = UIManager.getDefaults().keys();
+            while (keys.hasMoreElements()) {
+                Object key = keys.nextElement();
+                Object value = UIManager.get(key);
+                if (value instanceof javax.swing.plaf.FontUIResource) {
+                    UIManager.put(key, new javax.swing.plaf.FontUIResource(modernFont));
+                }
+            }
         } catch (Exception ignored) {}
 
         SwingUtilities.invokeLater(() -> {
