@@ -158,17 +158,16 @@ public class FedChainApp extends JFrame {
     }
 
     public static void main(String[] args) {
+        // Enable font anti-aliasing for smooth text
+        System.setProperty("awt.useSystemAAFontSettings", "on");
+        System.setProperty("swing.aatext", "true");
+
         try {
-            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-            
-            // Apply a modern, clean global font
-            Font modernFont = new Font("SansSerif", Font.PLAIN, 14);
-            java.util.Enumeration<Object> keys = UIManager.getDefaults().keys();
-            while (keys.hasMoreElements()) {
-                Object key = keys.nextElement();
-                Object value = UIManager.get(key);
-                if (value instanceof javax.swing.plaf.FontUIResource) {
-                    UIManager.put(key, new javax.swing.plaf.FontUIResource(modernFont));
+            // Force the modern 'Nimbus' theme instead of the ugly Linux default
+            for (UIManager.LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
+                if ("Nimbus".equals(info.getName())) {
+                    UIManager.setLookAndFeel(info.getClassName());
+                    break;
                 }
             }
         } catch (Exception ignored) {}
