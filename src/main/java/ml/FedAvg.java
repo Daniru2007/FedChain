@@ -35,5 +35,32 @@ public final class FedAvg {
 
         return averaged;
     }
+
+    public static Matrix[] aggregateWeights(List<Matrix[]> weightsList) {
+        Objects.requireNonNull(weightsList, "weightsList cannot be null");
+        if (weightsList.isEmpty()) {
+            throw new IllegalArgumentException("weightsList cannot be empty");
+        }
+
+        Matrix[] reference = weightsList.get(0);
+        Matrix[] averaged = new Matrix[reference.length];
+
+        for (int i = 0; i < reference.length; i++) {
+            Matrix sum = reference[i];
+            for (int n = 1; n < weightsList.size(); n++) {
+                Matrix[] params = weightsList.get(n);
+                if (params.length != reference.length) {
+                    throw new IllegalArgumentException("All weights must have the same number of parameters.");
+                }
+                if (params[i].getRows() != reference[i].getRows() || params[i].getCols() != reference[i].getCols()) {
+                    throw new IllegalArgumentException("All weights must have matching parameter shapes.");
+                }
+                sum = sum.add(params[i]);
+            }
+            averaged[i] = sum.scale(1.0 / weightsList.size());
+        }
+
+        return averaged;
+    }
 }
 
