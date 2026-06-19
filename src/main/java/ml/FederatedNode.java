@@ -27,9 +27,20 @@ public class FederatedNode {
         if (epochs < 0) {
             throw new IllegalArgumentException("epochs cannot be negative.");
         }
+        
+        int totalImages = localInputs.length;
+        int printInterval = Math.max(1, totalImages / 10); // Update the log 10 times per epoch
+        
         for (int epoch = 0; epoch < epochs; epoch++) {
-            for (int i = 0; i < localInputs.length; i++) {
+            for (int i = 0; i < totalImages; i++) {
                 localModel.train(localInputs[i], localTargets[i]);
+                
+                // Print progress periodically
+                if ((i + 1) % printInterval == 0 || i == totalImages - 1) {
+                    double progress = ((double) (i + 1) / totalImages) * 100;
+                    System.out.printf("[%s] Epoch %d/%d - Progress: %5.1f%% - Live Loss: %.4f\n", 
+                                      nodeId, epoch + 1, epochs, progress, localModel.getLoss());
+                }
             }
             lastLoss = recalculateLoss();
         }
