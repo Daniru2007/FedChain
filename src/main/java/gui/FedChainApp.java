@@ -166,7 +166,7 @@ public class FedChainApp extends JFrame {
                                 Thread.sleep(5000);
                                 NeuralNetwork currentModel = null;
                                 if (role == NodeLauncher.Role.TRAINER && activeNode.getTrainingNode() != null) {
-                                    currentModel = activeNode.getTrainingNode().getCoreNode().getLocalModel();
+                                    currentModel = activeNode.getTrainingNode().getLatestGlobalModel();
                                 } else if (role == NodeLauncher.Role.VALIDATOR && activeNode.getValidatorNode() != null) {
                                     currentModel = activeNode.getValidatorNode().getCurrentGlobalModel();
                                 }

@@ -21,12 +21,14 @@ public class AsyncTrainingNode {
     private volatile boolean training = false;
     private volatile boolean modelUpdated = false;
     private Thread trainingThread;
+    private ml.NeuralNetwork lastGlobalModel;
 
     public AsyncTrainingNode(FederatedNode coreNode, GossipNode gossipNode, int epochsPerRound) {
         this.coreNode = coreNode;
         this.gossipNode = gossipNode;
         this.epochsPerRound = epochsPerRound;
         this.gson = new GsonBuilder().create();
+        this.lastGlobalModel = coreNode.getLocalModel(); // Initial pristine state
     }
 
     public void startTraining() {
@@ -81,10 +83,15 @@ public class AsyncTrainingNode {
     public synchronized void onNewGlobalModel(Matrix[] newWeights) {
         System.out.println("[" + coreNode.getNodeId() + "] Received new global model. Updating and restarting training.");
         coreNode.setWeights(newWeights);
+        lastGlobalModel = coreNode.getLocalModel(); // Save pristine state for the dashboard
         modelUpdated = true;
         notify(); // Wake up the training thread
     }
     
+    public ml.NeuralNetwork getLatestGlobalModel() {
+        return lastGlobalModel;
+    }
+
     public FederatedNode getCoreNode() {
         return coreNode;
     }
