@@ -47,6 +47,9 @@ public class AsyncTrainingNode {
                 
                 System.out.println("[" + coreNode.getNodeId() + "] Finished training. Gossiping WEIGHT_UPDATE.");
                 GossipMessage msg = new GossipMessage(MessageType.WEIGHT_UPDATE, coreNode.getNodeId(), payload);
+                
+                // CRITICAL FIX: The node must process its own update locally to save it in its Pending Pool!
+                gossipNode.processLocally(msg);
                 gossipNode.broadcast(msg);
                 
                 // Pause training until the next global model arrives safely

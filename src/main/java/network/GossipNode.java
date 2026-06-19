@@ -66,6 +66,12 @@ public class GossipNode {
     public void setListener(Consumer<GossipMessage> listener) {
         this.messageListener = listener;
     }
+    
+    public void processLocally(GossipMessage msg) {
+        if (messageListener != null) {
+            messageListener.accept(msg);
+        }
+    }
 
     public void start() {
         if (running) return;

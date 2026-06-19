@@ -25,8 +25,17 @@ public class Main {
         System.out.println("=== FedChain V4 — Decentralized Async P2P Network ===");
 
         // 1. Load Data
-        Matrix[] trainImages = MNISTLoader.loadImages(TRAIN_IMAGES);
-        Matrix[] trainLabels = MNISTLoader.loadLabels(TRAIN_LABELS);
+        System.out.println("Loading MNIST data...");
+        Matrix[] fullImages = MNISTLoader.loadImages(TRAIN_IMAGES);
+        Matrix[] fullLabels = MNISTLoader.loadLabels(TRAIN_LABELS);
+        
+        // Slice dataset to 200 items for fast CLI simulation
+        int subsetSize = 200;
+        Matrix[] trainImages = new Matrix[subsetSize];
+        Matrix[] trainLabels = new Matrix[subsetSize];
+        System.arraycopy(fullImages, 0, trainImages, 0, subsetSize);
+        System.arraycopy(fullLabels, 0, trainLabels, 0, subsetSize);
+        
         Matrix[] testImages = MNISTLoader.loadImages(TEST_IMAGES);
         Matrix[] testLabels = MNISTLoader.loadLabels(TEST_LABELS);
 
