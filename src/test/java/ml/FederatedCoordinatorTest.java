@@ -15,14 +15,23 @@ class FederatedCoordinatorTest {
         return new Matrix(new double[][]{{a}, {b}});
     }
 
-    private static Matrix t(double value) {
-        return new Matrix(new double[][]{{value}});
+    /**
+     * Builds a permissive ConsensusEngine whose single validator always accepts.
+     * A tolerance of 1.0 (100 pp) means any accuracy >= (global - 100%) → always passes.
+     * The validation set mirrors the node data so the validator can evaluate the model.
+     */
+    private static ConsensusEngine permissiveConsensus(Matrix[] valImages, Matrix[] valLabels) {
+        ValidatorNode v = new ValidatorNode("TestValidator", valImages, valLabels, 1.0);
+        return new ConsensusEngine(List.of(v));
     }
 
     @Test
     void runRoundAddsAcceptedBlocksAndSynchronizesModels() {
         Matrix oh0 = new Matrix(new double[][]{{1.0}, {0.0}}); // one-hot class 0
         Matrix oh1 = new Matrix(new double[][]{{0.0}, {1.0}}); // one-hot class 1
+
+        Matrix[] valImages = {col(0,0), col(0,1), col(1,0), col(1,1)};
+        Matrix[] valLabels = {oh0, oh1, oh1, oh0};
 
         FederatedNode nodeA = new FederatedNode("NodeA",
                 new NeuralNetwork(new int[]{2, 4, 2}, 0.3, 1L),
@@ -39,9 +48,14 @@ class FederatedCoordinatorTest {
                 new Matrix[]{col(1,1)},
                 new Matrix[]{oh0});
 
+        NeuralNetwork globalModel = new NeuralNetwork(new int[]{2, 4, 2}, 0.3, 0L);
         BlockChain blockchain = new BlockChain(10.0);
         FederatedCoordinator coordinator = new FederatedCoordinator(
-                List.of(nodeA, nodeB, nodeC), blockchain, 10);
+                List.of(nodeA, nodeB, nodeC),
+                blockchain,
+                permissiveConsensus(valImages, valLabels),
+                globalModel,
+                10);
 
         coordinator.runRound(1);
 
@@ -60,6 +74,9 @@ class FederatedCoordinatorTest {
         Matrix oh0 = new Matrix(new double[][]{{1.0}, {0.0}});
         Matrix oh1 = new Matrix(new double[][]{{0.0}, {1.0}});
 
+        Matrix[] valImages = {col(0,0), col(0,1), col(1,0), col(1,1)};
+        Matrix[] valLabels = {oh0, oh1, oh1, oh0};
+
         FederatedNode nodeA = new FederatedNode("NodeA",
                 new NeuralNetwork(new int[]{2, 4, 2}, 0.3, 11L),
                 new Matrix[]{col(0,0), col(0,1)},
@@ -70,9 +87,14 @@ class FederatedCoordinatorTest {
                 new Matrix[]{col(1,0), col(1,1)},
                 new Matrix[]{oh1, oh0});
 
+        NeuralNetwork globalModel = new NeuralNetwork(new int[]{2, 4, 2}, 0.3, 0L);
         BlockChain blockchain = new BlockChain(10.0);
         FederatedCoordinator coordinator = new FederatedCoordinator(
-                List.of(nodeA, nodeB), blockchain, 5);
+                List.of(nodeA, nodeB),
+                blockchain,
+                permissiveConsensus(valImages, valLabels),
+                globalModel,
+                5);
 
         for (int round = 1; round <= 5; round++) {
             coordinator.runRound(round);
@@ -88,6 +110,9 @@ class FederatedCoordinatorTest {
         Matrix oh0 = new Matrix(new double[][]{{1.0}, {0.0}});
         Matrix oh1 = new Matrix(new double[][]{{0.0}, {1.0}});
 
+        Matrix[] valImages = {col(0,0), col(0,1), col(1,0), col(1,1)};
+        Matrix[] valLabels = {oh0, oh1, oh1, oh0};
+
         FederatedNode nodeA = new FederatedNode("NodeA",
                 new NeuralNetwork(new int[]{2, 4, 2}, 0.3, 42L),
                 new Matrix[]{col(0,0), col(0,1)},
@@ -98,9 +123,14 @@ class FederatedCoordinatorTest {
                 new Matrix[]{col(1,0), col(1,1)},
                 new Matrix[]{oh1, oh0});
 
+        NeuralNetwork globalModel = new NeuralNetwork(new int[]{2, 4, 2}, 0.3, 0L);
         BlockChain blockchain = new BlockChain(10.0);
         FederatedCoordinator coordinator = new FederatedCoordinator(
-                List.of(nodeA, nodeB), blockchain, 500);
+                List.of(nodeA, nodeB),
+                blockchain,
+                permissiveConsensus(valImages, valLabels),
+                globalModel,
+                500);
 
         coordinator.runRound(1);
         double lossAfterRound1 = coordinator.getGlobalLoss();
